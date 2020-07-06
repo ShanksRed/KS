@@ -1,0 +1,149 @@
+// программа для считывания файла input.txt
+/* содержание input.txt
+[ block1 ]
+key1    2
+key2   0.1
+
+[ block3 ]
+key3    3
+
+[ block2 ]
+key3    5
+*/
+
+#include <stdlib.h>
+#include <string>
+#include <stdio.h>
+#include <string.h>
+#include <iostream>
+#include <fstream>
+
+using namespace std;
+//#pragma warning(disable : 4996) // Без этого не работали функции strcpy
+
+// 
+const int MAX_LEN = 256;
+// служебный символ - после него идет название блока
+char block[MAX_LEN] = { "[" };
+// названия блоков 
+char block1[MAX_LEN] = { "block1" };
+char block2[MAX_LEN] = { "block2" };
+char block3[MAX_LEN] = { "block3" };
+// ключевые слова
+char key_word3[MAX_LEN] = { "key3" };
+char key_word2[MAX_LEN] = { "key2" };
+char key_word1[MAX_LEN] = { "key1" };
+// название входного файла 
+char source[MAX_LEN] = "input.txt";
+
+// прочитать ключи из блока типа-1
+void read_block_type1(int *key1, double *key2) {
+	ifstream ifs(source, ifstream::in);
+
+	char word[MAX_LEN];
+
+	while (ifs.good()) {
+		ifs >> word;
+
+		// если нашли блок
+		if (strstr(word, block)) {
+			// считываем его название
+			ifs >> word;
+			// и только если это первый блок..
+			if (strstr(word, block1)) {
+				while (ifs.good()) {
+					ifs >> word;
+					// если нашли начало нового блока, то прерываем
+					if (strstr(word, block)) {
+						// закрываем файл
+						ifs.close();
+						return;
+					}
+
+					// сравниваем с ключами
+
+					// нашли первый ключ
+					if (strstr(word, key_word1)) {
+						// запоминаем его значение
+						ifs >> word;
+						*key1 = atoi(word);
+					}
+					// нашли второй ключ
+					if (strstr(word, key_word2)) {
+						// запоминаем его значение
+						ifs >> word;
+						*key2 = atof(word);
+					}
+				} // while=2
+			}//
+		}
+
+
+	}
+}
+
+// прочитать ключи из блока типа-1
+void read_block_type2(char* block_name, int *key) {
+	ifstream ifs(source, ifstream::in);
+
+	char word[MAX_LEN];
+
+	while (ifs.good()) {
+		ifs >> word;
+
+		// если нашли блок
+		if (strstr(word, block)) {
+			// считываем его название
+			ifs >> word;
+			// и только если это нужный блок (block_name)..
+			if (strstr(word, block_name)) {
+				while (ifs.good()) {
+					ifs >> word;
+					// если нашли начало нового блока, то прерываем
+					if (strstr(word, block)) {
+						// закрываем файл
+						ifs.close();
+						return;
+					}
+
+					// сравниваем с ключами
+
+					// нашли первый ключ
+					if (strstr(word, key_word3)) {
+						// запоминаем его значение
+						ifs >> word;
+						*key = atoi(word);
+					}
+				} // while=2
+			}//
+		}
+
+
+	}
+}
+/*
+//
+int main() {
+	// 
+	int a = 0;
+	double b = 0;
+	read_block_type1(&a, &b);
+	cout << "parameters in block-1" << endl;
+	cout << a << endl;
+	cout << b << endl;
+
+	// 
+	int c;
+	read_block_type2(block2, &c);
+	cout << "parameters in block-2" << endl;
+	cout << c << endl;
+
+	// 
+	int d;
+	read_block_type2(block3, &d);
+	cout << "parameters in block-3" << endl;
+	cout << d << endl;
+
+	return 0;
+}
+*/
