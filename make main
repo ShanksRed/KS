@@ -1,0 +1,435 @@
+#include <iostream>
+#include <math.h>
+#include <iomanip>
+#include <fstream> 
+#include <stdio.h>
+#include <cstdlib>
+#include <vector>
+#include <string>
+#include "readFromFile.h"
+
+using namespace std;
+
+double Pi = 3.141592653589793238462643, R0 = 0.5, T = 298.15, eps = 80, eps0 = 8.85418785*pow(10, -12),
+e = 1.6021773349*pow(10, -19), KB = 1.38065812 *pow(10, -23),f;
+
+enum FreeType { neutral, strong_acid, weak_acid };
+
+
+class molSystem {
+public:
+	molSystem() {
+		//чтение из файла
+		ReadFile(&r, &Ns, &g, &db, &M, &tempForSystemChoise, &max_step, &speed, &tolerance, &alpha_charge, &phibS, &pH, &KW, &KA, &b, &surfaceRadius);
+		f = pow(e, 2) / (eps*eps0*b*KB*T);
+		Fn = f * (1.0 / (2 * Pi));
+		//выделение памяти
+		G = new double[r];
+		U = new double[r];
+		Cneg = new double[r];
+		Cpos = new double[r];
+		phiSide = new double[r];
+		Phi = new double[r];
+		phiNA = new double[r];
+		phiAH = new double[r];
+		phiA = new double[r];
+		phiP = new double[r];
+		phiH2O = new double[r];
+		phiH3O = new double[r];
+		phiOH = new double[r];
+		phiCL = new double[r];
+		phiW = new double[r];
+		potential0 = new double[r];
+		potential = new double[r];
+		Gf = new double **[r];
+		Gb = new double **[r];
+		L = new double[r];
+		A = new double[r];
+		LambdaF = new double[r];
+		LambdaS = new double[r];
+		LambdaB = new double[r];
+		phiTotal = new double[r];
+		chargeLayer = new double[r];
+		alpha = new double[r];
+		grad = new double[r];
+		GH2O = new double[r];
+		GH3O = new double[r];
+		GOH = new double[r];
+		GAH = new double[r];
+		GA = new double[r];
+		GW = new double[r];
+		GP = new double[r];
+		GNA = new double[r];
+		GCL = new double[r];
+		AlphaOH = new double[r];
+		AlphaH3O = new double[r];
+		AlphaH2O = new double[r];
+		AlphaAH = new double[r];
+		AlphaA = new double[r];
+		massLagrange = new double[r];
+		LambdaF = new double[r];
+		LambdaS = new double[r];
+		LambdaB = new double[r];
+		A = new double[r];
+
+		//начальная инициализация
+		for (int rt = 1; rt < r - 1; rt++) {
+			GH2O[rt] = GH3O[rt] = GOH[rt] = GAH[rt] = GA[rt] = GW[rt] = GP[rt] = GNA[rt] = GCL[rt] =
+				AlphaH3O[rt] = AlphaOH[rt] = AlphaH2O[rt] = AlphaAH[rt] = AlphaA[rt] = chargeLayer[rt] =
+				phiNA[rt] = phiAH[rt] = phiA[rt] = phiCL[rt] = phiH3O[rt] = phiH2O[rt] = phiOH[rt] = 
+				phiP[rt] = phiW[rt] = potential[rt] = potential0[rt] = massLagrange[rt]=0;
+		}
+		//память под Gf и Gb
+		for (int i = 0; i < r; i++)
+		{
+			Gf[i] = new double *[Ns + 2];
+			for (int j = 0; j < Ns + 2; j++)
+				Gf[i][j] = new double[g + 2];
+		}
+		for (int i = 0; i < r; i++)
+		{
+			Gb[i] = new double *[Ns + 2];
+			for (int j = 0; j < Ns + 2; j++)
+				Gb[i][j] = new double[g + 2];
+		}
+		//выбираем систему
+		if (tempForSystemChoise == 0) choise = neutral;
+		else if (tempForSystemChoise == 1) choise = strong_acid;
+		else choise = weak_acid;
+	}
+
+
+
+	void NumberOfCells() {
+		for (int i = 0; i < r; i++) L[i] = 4.0 / 3.0 * Pi*(3 * pow((i + R0), 2) - 3 * (i + R0) + 1);
+
+	}
+	void ContactSurf() {
+		for (int i = 0; i < r; i++) A[i] = 4 * Pi*pow((r + R0), 2);
+	}
+
+	void probability() {
+		double tempLambdB, tempLambdF, tempLambdS;
+		tempLambdF = 1.0 / 6;
+		tempLambdB = 1.0 / 6;
+		tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
+		for (int i = 1; i < r; i++) {
+			LambdaF[i] = tempLambdF*(A[i] / L[i]);
+			LambdaB[i] = tempLambdB*(A[i - 1] / L[i]);
+			LambdaS[i] = 1 - LambdaF[i] - LambdaB[i];
+		}
+	}
+
+
+
+
+
+
+	//инициализация Gf и Gb
+	void initializeBackAndForward() {
+		for (int j = 1; j < r - 1; j++) {
+			Gb[j][Ns + 1][g] = GP[j];
+		}
+		Gf[1][1][1] = 1;
+	}
+
+	//считаем Gb
+	void PropogatorMatricesGb(double*LambdaB, double*LambdaS, double*LambdaF) {
+
+		for (int kt = 1; kt < g + 1; kt++) {
+			//от чего s
+			for (int st = Ns + 1; st > 1; st--) {
+				for (int rt = 1; rt < r - 1; rt++) {
+					Gb[rt][st - 1][g + 1 - kt] = G[rt] * (LambdaB[rt] * Gb[rt - 1][st][g + 1 - kt] + LambdaS[rt] * Gb[rt][st][g + 1 - kt] + LambdaF[rt] * Gb[rt + 1][st][g + 1 - kt]);
+				}
+			}
+			// точка ветвления для Gb
+			for (int rt = 1; rt < r - 1; rt++) {
+				Gb[rt][Ns + 1][g + 1 - kt - 1] = pow(Gb[rt][1][g + 1 - kt], db - 1) / pow(G[rt], db - 2);
+			}
+		}
+	}
+	//считаем Gf
+	void  PropogatorMatricesGf(double*LambdaB, double*LambdaS, double*LambdaF) {
+
+		for (int kt = 1; kt < g + 1; kt++) {
+			for (int st = 2; st <= Ns + 1; st++) {
+				for (int rt = 1; rt < r - 1; rt++) {
+					Gf[rt][st][kt] = G[rt] * (LambdaB[rt] * Gf[rt - 1][st - 1][kt] + LambdaS[rt] * Gf[rt][st - 1][kt] + LambdaF[rt] * Gf[rt + 1][st - 1][kt]);
+				}
+			}
+			for (int rt = 1; rt < r - 1; rt++) {// точка ветвления для Gb
+				Gf[rt][1][kt + 1] = Gf[rt][Ns + 1][kt] * pow(Gb[rt][1][kt + 1], db - 2) / pow(G[rt], db - 2);
+			}
+		}
+	}
+
+	//считаем обьемные доли воды(в воде?)
+	void CalculationProportionInWater() {
+		Cw = 1 / (6.02*pow(10, 23) * 1000 * pow(b, 3));
+		if (choise == 0) {   //normal
+			phibW = 1;
+		}
+		else if (choise == 1) { //strong
+			phibNa = phibCl = phibS;
+			phibW = 1 - phibCl - phibNa;
+		}
+		else {               //weak
+			float KwDer = KW / 2 * Cw;
+			float KaDer = KA / Cw;
+			phibH3O = pow(10, -pH) / Cw;
+			phibH2O = (-1 + sqrt(1 + 4 * (1 - 2 * phibS)*KwDer / phibH3O)) / (2 * 2 * KwDer / phibH3O);
+			phibOH = 1 / 2 * (1 - 2 * phibS - phibH2O);
+			phibW = phibH3O + phibH2O + phibOH;
+			phibNa = 1 - phibW - phibS;
+			alphabH2O = phibH2O / phibW;
+			alphabOH = phibOH / phibW;
+			alphabH3O = phibH3O / phibW;
+			float temp = KaDer * alphabH2O / alphabH3O;
+			alphabA = temp / (temp + 1);
+			alphabAH = 1 - alphabA;
+		}
+	}
+
+	//Константы для электростатического потенциала
+	void auxiliaryFactors() {
+		for (int i = 0; i < r; i++) {
+			Cneg[i] = 2 * pow((r + surfaceRadius - 1), 2);
+			Cpos[i] = 2 * pow((r + surfaceRadius), 2);
+		}
+		Cneg[0] = 0;
+	}
+
+	//L
+	void NumberOfCells() {
+		for (int i = 0; i < r; i++) L[i] = 4.0 / 3.0 * Pi*(3 * pow((i + R0), 2) - 3 * (i + R0) + 1);
+	}
+	//A
+	void ContactSurf() {
+		for (int i = 0; i < r; i++) A[i] = 4 * Pi*pow((i + R0), 2);
+	}
+	//лямбда
+	void probability() {
+		double tempLambdB, tempLambdF, tempLambdS;
+		tempLambdF = 1.0 / 6;
+		tempLambdB = 1.0 / 6;
+		tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
+		for (int i = 1; i < r; i++) {
+			LambdaF[i] = tempLambdF * (A[i] / L[i]);
+			LambdaB[i] = tempLambdB * (A[i - 1] / L[i]);
+			LambdaS[i] = 1 - LambdaF[i] - LambdaB[i];
+		}
+	}
+
+	//расчитать Фи
+	void densityProfile(double*L) {
+		double *phiDer = new double[r];
+		double temp1, temp2, q;
+		for (int rt = 0; rt < r - 1; rt++) {
+			phiDer[rt] = 0;
+		}
+		for (int rt = 1; rt < r - 1; rt++) {
+			temp1 = temp2 = 0;
+			for (int st = 1; st < Ns + 1; st++) {
+				temp1 += Gf[rt][st][1] * Gb[rt][st][1] / G[rt];
+			}
+			for (int kt = 2; kt < g + 1; kt++) { // g or g+1 ?
+				for (int st = 1; st < Ns + 1; st++) {
+					temp2 += pow((db - 1), kt - 1)*Gf[rt][st][kt] * Gb[rt][st][kt] / G[rt];
+				}
+			}
+			phiDer[rt] += temp1 + temp2;
+		}
+		//ищем стат.сумму
+		q = 0;
+		for (int rt = 1; rt < r - 1; rt++) {
+			q += (phiDer[rt] * L[rt]);
+		}
+		for (int rt = 1; rt < r - 1; rt++) {
+			phiP[rt] = (phiDer[rt] * theta) / q;
+		}
+	}
+	//Phi
+	void densiyProfileForW() {
+		for (int rt = 1; rt < r - 1; rt++) {
+			phiW[rt] = phibW * GW[rt];
+		}
+	}
+
+	//градиент
+	void SearchGrad() {
+		for (int rt = 1; rt < r - 1; rt++) {
+			grad[rt] += -1 + 1 / phiTotal[rt];
+		}
+	}
+	//поле Лагранжа
+	void Lagrange() {
+		for (int rt = 1; rt < r - 1; rt++) {
+			massLagrange[rt] = massLagrange[rt] - speed * grad[rt];
+		}
+
+	}
+
+	//электростатический потенциал
+	void ElectrostaticPotential() {
+
+		//значения потенциала
+		for (int j = 1; j < r - 1; j++) {
+			potential0[j] = potential[j];
+		}
+
+		potential0[r - 1] = potential[r - 2];
+		for (int j = 1; j < r - 1; j++) {
+			potential[j] = (Cneg[j] * potential0[j - 1] + Fn * chargeLayer[j] + Cpos[j] * potential0[j + 1]) / (Cpos[j] + Cneg[j]);
+		}
+
+	}
+	//расчитываем веса Больцмана
+	void BolzmonWeights() {
+		if (choise == 0) {
+			// без электростатики
+			for (int j = 1; j < r - 1; j++) {
+				GW[j] = exp(-massLagrange[j]);
+				GP[j] = exp(-massLagrange[j]);
+
+			}
+		}
+		else if (choise == 1) {
+			// электростатика
+			for (int j = 1; j < r - 1; j++) {
+				GW[j] = exp(-massLagrange[j]);
+				GP[j] = exp(-massLagrange[j] + alpha_charge * potential[j]);
+				GNA[j] = exp(-massLagrange[j] - potential[j]);
+				GCL[j] = exp(-massLagrange[j] + potential[j]);
+			}
+		}
+		else {
+			// электростатика с реакциями
+			for (int j = 1; j < r - 1; j++) {
+				GH2O[j] = exp(-massLagrange[j]);
+				GH3O[j] = exp(-massLagrange[j] - AlphaH3O[j] * potential[j]);
+				GOH[j] = exp(-massLagrange[j] + AlphaOH[j] * potential[j]);
+				GW[j] = alphabH2O * GH2O[j] + alphabH3O * GH3O[j] + alphabOH * GOH[j];
+
+				GAH[j] = exp(-massLagrange[j]);
+				GA[j] = exp(-massLagrange[j] + AlphaA[j] * potential[j]);
+				GP[j] = alphabAH * GAH[j] + alphabA * GA[j];
+
+				GNA[j] = exp(-massLagrange[j] - potential[j]);
+				GCL[j] = exp(-massLagrange[j] + potential[j]);
+			}
+
+		}
+	}
+	//локальные степени ионизации
+	void LocalDegreesIonization() {
+		for (int j = 1; j < r - 1; j++) {
+			AlphaOH[j] = alphabOH * GOH[j] / GW[j];
+			AlphaH3O[j] = alphabH3O * GH3O[j] / GW[j];
+			AlphaH2O[j] = alphabH2O * GH2O[j] / GW[j];
+			AlphaAH[j] = alphabAH * GAH[j] / GP[j];
+			AlphaA[j] = alphabA * GA[j] / GP[j];
+
+		}
+	}
+	//плотность полимера и плотности состояний
+	void PpolymerDensity() {
+		for (int j = 1; j < r - 1; j++) {
+			phiCL[j] = phibCl * GCL[j];
+			phiNA[j] = phibNa * GNA[j];
+			phiW[j] = phibW * GW[j];
+			densityProfile(L);
+			if (choise == 2) {
+				phiAH[j] = AlphaAH[j] * phiP[j];
+				phiA[j] = AlphaA[j] * phiP[j];
+				phiH2O[j] = AlphaH2O[j] * phiW[j];
+				phiH3O[j] = AlphaH3O[j] * phiW[j];
+				phiOH[j] = AlphaOH[j] * phiW[j];
+			}
+
+		}
+	}
+	void FullChargeCalculation() {
+		for (int j = 1; j < r - 1; j++) {
+			chargeLayer[j] = -AlphaA[j] * L[j] * phiA[j] + AlphaH3O[j] * L[j] * phiH3O[j] - AlphaOH[j] * L[j] * phiOH[j] - phiCL[j] * L[j] + L[j] * phiNA[j];
+		}
+	}
+	
+	int getMaxStep() {
+		return max_step;
+	}
+
+
+
+
+private:
+	int r,typeQuantity, tempForSystemChoise;
+	FreeType choise;
+	int Tr, Ns, g, db, M, max_step;
+	double phibS, alpha_charge, q, theta, N, speed, tolerance, pH, KW, KA, b,
+		phibW, phibNa, phibCl, phibH2O, phibOH, phibH3O, Cw, alphabH2O, alphabOH,
+		alphabH3O, alphabA, alphabAH, surfaceRadius, Fn, densityOnSurface;
+	
+	double* A;
+	double *LambdaF;
+	double *LambdaS;
+	double *LambdaB;
+	double *G;
+	double *U;
+	double *Cneg;
+	double *Cpos;
+	double *phiSide;
+	double *Phi;
+	double *phiNA;
+	double *phiAH;
+	double *phiA;
+	double *phiP;
+	double *phiH2O;
+	double *phiH3O;
+	double *phiOH;
+	double *phiCL;
+	double *phiW;
+	double *potential0;
+	double *potential;
+	double ***Gf ;
+	double ***Gb ;
+	double *L;
+	double *A;
+	double *LambdaF;
+	double *LambdaS;
+	double *LambdaB;
+	double *phiTotal;
+	double *chargeLayer;
+	double *alpha;
+	double *grad;
+	double *GH2O;
+	double *GH3O;
+	double *GOH;
+	double *GAH;
+	double *GA;
+	double *GW;
+	double *GP;
+	double *GNA;
+	double *GCL;
+	double *AlphaOH;
+	double *AlphaH3O;
+	double *AlphaH2O;
+	double *AlphaAH;
+	double *AlphaA;
+	double *massLagrange;
+
+
+
+
+};
+
+
+int main()
+{
+	molSystem MyMolSystem;
+	MyMolSystem.CalculationProportionInWater();
+	for (int i = 0; i < MyMolSystem.getMaxStep(); i++) {
+
+	}
+
+}
