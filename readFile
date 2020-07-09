@@ -1,26 +1,30 @@
-#include <string>
+#include <iostream>
 #include <fstream>
+#include <string>
+using namespace std;
 
 
-void ReadFile(int *Ns, int* g,int* db, int* M,int *tempForSystem,int * max_step,double*speed, double*tolerance, double*alpha_charge,
-	          double*phibS, double*pH, double*KW, double*KA,double*b,double*surfaceRadius) {
+
+void ReadFile(int *r,int *Ns, int* g, int* db, int* M, int *tempForSystem, int * max_step, double*speed, double*tolerance, double*alpha_charge,
+	double*phibS, double*pH, double*KW, double*KA, double*b, double*surfaceRadius) {
 	ifstream infile("data1.txt");
 	string str;
-	infile >> str >> *Ns; 
-	infile >> str >> *g; 
-	infile >> str >> *db; 
-	infile >> str >> *M; 
+	infile >> str >> *r;
+	infile >> str >> *Ns;
+	infile >> str >> *g;
+	infile >> str >> *db;
+	infile >> str >> *M;
 	infile >> str >> *tempForSystem;
 	infile >> str >> *max_step;
-	infile >> str >> *speed; 
-	infile >> str >> *tolerance; 
-	infile >> str >> *alpha_charge; 
-	infile >> str >> *phibS; 
-	infile >> str >> *pH; 
-	infile >> str >> *KW; 
-	infile >> str >> *KA; 
-	infile >> str >> *b; 
-	infile >> str >> *surfaceRadius; 
-	
+	infile >> str >> *speed;
+	infile >> str >> *tolerance;
+	infile >> str >> *alpha_charge;
+	infile >> str >> *phibS;
+	infile >> str >> *pH;
+	infile >> str >> *KW;
+	infile >> str >> *KA;
+	infile >> str >> *b;
+	infile >> str >> *surfaceRadius;
+	infile.close();
 
 }
