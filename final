@@ -1,10 +1,5 @@
 #include <iostream>
 #include <math.h>
-#include <iomanip>
-#include <fstream> 
-#include <stdio.h>
-#include <cstdlib>
-#include <vector>
 #include <string>
 #include "readFromFile.h"
 
@@ -379,8 +374,8 @@ public:
 		outPutOne << "r phiP phiW phiCl phiNA chargeLayer potential\n";
 		outPutTwo << "r phiA phiAH phiOH phiH3O phiH2O \n";
 		for (int i = 1; i < r; i++) {
-			outPutOne << phiP[i] << phiW[i] << phiCL[i] << phiNA[i] << chargeLayer[i] << potential[i]<<endl;
-			outPutTwo << phiA[i] << phiAH[i] << phiOH[i]<< phiH3O[i] << phiH2O[i] << endl;
+			outPutOne <<i<<" "<< phiP[i]<<" " << phiW[i] << " " << phiCL[i] << " " << phiNA[i] << " " << chargeLayer[i] << " " << potential[i]<<endl;
+			outPutTwo << i << " " << phiA[i] << " " << phiAH[i] << " " <<  phiOH[i] << " " << phiH3O[i] << " " << phiH2O[i] << endl;
 		}
 		outPutOne.close();
 		outPutTwo.close();
@@ -475,7 +470,6 @@ int main()
 		MyMolSystem.FullChargeCalculation();
 
 		if (MyMolSystem.GradientLenght() < MyMolSystem.getTolerance()) {
-			cout << "я зашел";
 			MyMolSystem.WriteToFile();
 			break;
 		}
