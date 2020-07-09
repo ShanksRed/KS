@@ -1,11 +1,10 @@
-#include <iostream>
-#include <fstream>
 #include <string>
+#include <fstream>
+
 using namespace std;
 
-
-
-void ReadFile(int *r,int *Ns, int* g, int* db, int* M, int *tempForSystem, int * max_step, double*speed, double*tolerance, double*alpha_charge,
+void ReadFile(int *r, int *Ns, int* g, int* db, int* M, int *tempForSystem, int * max_step, double*speed, double*tolerance,
+	double*alpha_charge,
 	double*phibS, double*pH, double*KW, double*KA, double*b, double*surfaceRadius) {
 	ifstream infile("data1.txt");
 	string str;
@@ -25,6 +24,6 @@ void ReadFile(int *r,int *Ns, int* g, int* db, int* M, int *tempForSystem, int *
 	infile >> str >> *KA;
 	infile >> str >> *b;
 	infile >> str >> *surfaceRadius;
-	infile.close();
+
 
 }
